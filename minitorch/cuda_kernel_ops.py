@@ -192,6 +192,17 @@ class CudaKernelOps(TensorOps):
 
     @staticmethod
     def matrix_multiply_cublas(a: Tensor, b: Tensor) -> Tensor:
+        # allow for 3D * 2D
+        # if len(a.shape) == 3 and len(b.shape) == 2:
+        #     b = b.contiguous().view(1, b.shape[0], b.shape[1])
+        #     b = b.expand(a.shape[0], b.shape[1], b.shape[2])
+        # elif len(a.shape) == 2 and len(b.shape) == 3:
+        #     a = a.contiguous().view(1, a.shape[0], a.shape[1])
+        #     a = a.expand(b.shape[0], a.shape[1], a.shape[2])
+        # elif len(a.shape) == 2 and len(b.shape) == 2:
+        #     a = a.contiguous().view(1, a.shape[0], a.shape[1])
+        #     b = b.contiguous().view(1, b.shape[0], b.shape[1])
+        # allow for 3D * 2D
         both_2d = 0
         if len(a.shape) == 2:
             a = a.contiguous().view(1, a.shape[0], a.shape[1])
@@ -290,6 +301,17 @@ class CudaKernelOps(TensorOps):
 
     @staticmethod
     def matrix_multiply(a: Tensor, b: Tensor) -> Tensor:
+        # allow for 3D * 2D
+        # if len(a.shape) == 3 and len(b.shape) == 2:
+        #     b = b.contiguous().view(1, b.shape[0], b.shape[1])
+        #     b = b.expand(a.shape[0], b.shape[1], b.shape[2])
+        # elif len(a.shape) == 2 and len(b.shape) == 3:
+        #     a = a.contiguous().view(1, a.shape[0], a.shape[1])
+        #     a = a.expand(b.shape[0], a.shape[1], a.shape[2])
+        # elif len(a.shape) == 2 and len(b.shape) == 2:
+        #     a = a.contiguous().view(1, a.shape[0], a.shape[1])
+        #     b = b.contiguous().view(1, b.shape[0], b.shape[1])
+        # allow for 3D * 2D
         both_2d = 0
         if len(a.shape) == 2:
             a = a.contiguous().view(1, a.shape[0], a.shape[1])

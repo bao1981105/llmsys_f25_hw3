@@ -33,7 +33,7 @@ class Embedding(Module):
         self.num_embeddings = num_embeddings # Vocab size
         self.embedding_dim  = embedding_dim  # Embedding Dimension
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        self.weights = Parameter(rand((num_embeddings, embedding_dim)))
         ### END ASSIGN3_2
     
     def forward(self, x: Tensor):
@@ -47,7 +47,12 @@ class Embedding(Module):
         """
         bs, seq_len = x.shape
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        # one hot + matmul is slow, but we use indexing directly to get the embedding vectors, we leave computation graph
+        one_hot_x = one_hot(x, self.num_embeddings)  # (bs, seq_len, num_embeddings)
+        # Reshape for matmul: (bs * seq_len, num_embeddings) @ (num_embeddings, emb_dim)
+        flat_one_hot = one_hot_x.view(bs * seq_len, self.num_embeddings)
+        emb = flat_one_hot @ self.weights.value  # (bs * seq_len, emb_dim)
+        return emb.view(bs, seq_len, self.embedding_dim)
         ### END ASSIGN3_2
 
     
@@ -71,7 +76,17 @@ class Dropout(Module):
             output : Tensor of shape (*)
         """
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        if self.training and self.p_dropout > 0:
+            # Use numpy's random generator for deterministic results in tests
+            mask = np.random.binomial(1, 1 - self.p_dropout, size=x.shape)
+            # can we use np.random.binomial and tensor_from_numpy in forward? Will this break the autograd?
+            #mask = rand(x.shape, backend=x.backend)
+            mask = tensor_from_numpy(mask, backend=x.backend)
+            output = x * mask
+            output = output / (1 - self.p_dropout)
+            return output
+        else:
+            return x
         ### END ASSIGN3_2
 
 
@@ -91,7 +106,25 @@ class Linear(Module):
         """
         self.out_size = out_size
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        self.backend = backend
+        bound = 1 / np.sqrt(in_size)
+        self.weights = Parameter(
+            tensor_from_numpy(
+                np.random.uniform(-bound, bound, (in_size, out_size)),
+                backend=backend
+            )
+        ) 
+        # weights shape (in_size, out_size)
+        if bias:
+            self.bias = Parameter(
+                tensor_from_numpy(
+                    np.random.uniform(-bound, bound, (out_size,)),
+                    backend=backend
+                )
+            )
+        else:
+            self.bias = None
+        # bias shape (out_size,)
         ### END ASSIGN3_2
 
     def forward(self, x: Tensor):
@@ -103,11 +136,27 @@ class Linear(Module):
         Returns:
             output : Tensor of shape (n, out_size)
         """
-        batch, in_size = x.shape
+        # batch, in_size = x.shape
+        # output = x @ self.weights.value  # (batch, out_size)
+        # if self.bias is not None:
+        #     output = output + self.bias.value  # broadcasting (out_size, )
+        # return output
+        
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        if len(x.shape) == 2:
+            return x @ self.weights.value + (self.bias.value if self.bias is not None else 0)
+        elif len(x.shape) == 3:
+            # (batch, seq_len, in_size)
+            batch, seq_len, in_size = x.shape
+            x_flat = x.view(batch * seq_len, in_size)
+            out_flat = x_flat @ self.weights.value  # (batch * seq_len, out_size)
+            if self.bias is not None:
+                out_flat = out_flat + self.bias.value
+            out = out_flat.view(batch, seq_len, self.out_size)
+            return out
+        else:
+            raise ValueError(f"Linear.forward: Unexpected input shape {x.shape}")
         ### END ASSIGN3_2
-
 
 class LayerNorm1d(Module):
     def __init__(self, dim: int, eps: float, backend: TensorBackend):
@@ -125,7 +174,9 @@ class LayerNorm1d(Module):
         self.dim = dim
         self.eps = eps
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        self.weights = Parameter(tensor_from_numpy(np.ones(dim), backend=backend))
+        self.bias = Parameter(tensor_from_numpy(np.zeros(dim), backend=backend))
+        self.backend = backend
         ### END ASSIGN3_2
 
     def forward(self, x: Tensor) -> Tensor:
@@ -141,5 +192,11 @@ class LayerNorm1d(Module):
         """
         batch, dim = x.shape
         ### BEGIN ASSIGN3_2
-        raise NotImplementedError
+        mean = x.mean(dim=1).view(batch, 1)  # (bs, 1)
+        # for layer norm, we normalize over the last dimension
+        # var = ((x - mean) ** 2).sum(axes=(1,), keepdims=True) / dim  # (bs, 1)
+        var = x.var(dim=1).view(batch, 1)
+        x_normalized = (x - mean) / (var + self.eps) ** 0.5  # (bs, dim)
+        output = x_normalized * self.weights.value + self.bias.value  # broadcasting (dim, )
+        return output
         ### END ASSIGN3_2

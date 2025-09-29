@@ -185,17 +185,36 @@ def GELU(input: Tensor) -> Tensor:
     return 0.5 * input * (1 + (np.sqrt(2 / math.pi) * (input + 0.044715 * (input ** 3))).tanh())
 
 
-def one_hot(input: Tensor, num_classes: int) -> Tensor:
-    """Takes a Tensor containing indices of shape (*) and returns a tensor of shape (*, num_classes) 
-    that contains zeros except a 1 where the index of last dimension matches the corresponding value of the input tensor.
-    This is analogous to torch.nn.functional.one_hot (which contains helpful examples you may want to play around with)
+# def one_hot(input: Tensor, num_classes: int) -> Tensor:
+#     """Takes a Tensor containing indices of shape (*) and returns a tensor of shape (*, num_classes) 
+#     that contains zeros except a 1 where the index of last dimension matches the corresponding value of the input tensor.
+#     This is analogous to torch.nn.functional.one_hot (which contains helpful examples you may want to play around with)
 
-    Hint: You may want to use a combination of np.eye, tensor_from_numpy, 
+#     Hint: You may want to use a combination of np.eye, tensor_from_numpy, 
+#     Suppose there are 3 classes, convert [2, 0, 1] to [[0, 0, 1], [1, 0, 0], [0, 1, 0]]
+#     """
+#     return tensor_from_numpy(
+#                 np.eye(num_classes)[input.to_numpy().astype(int)], 
+#                 backend=input.backend
+#             )
+
+def one_hot(input: Tensor, num_classes: int) -> Tensor:
     """
-    return tensor_from_numpy(
-                np.eye(num_classes)[input.to_numpy().astype(int)], 
-                backend=input.backend
-            )
+    Differentiable one_hot using only tensor ops.
+    Args:
+        input: (batch, seq_len) integer tensor
+        num_classes: int
+    Returns:
+        (batch, seq_len, num_classes) float tensor
+    """
+    # input: (batch, seq_len)
+    shape = input.shape + (num_classes,)  # (batch, seq_len, num_classes)
+    # Create a tensor with values 0..num_classes-1, shape (1, 1, num_classes)
+    class_range = tensor_from_numpy(np.arange(num_classes).reshape((1,) * len(input.shape) + (num_classes,)), backend=input.backend)
+    # Expand input to (batch, seq_len, num_classes)
+    input_expanded = input.view(*input.shape, 1)
+    # Compare: (batch, seq_len, 1) == (1, 1, num_classes) -> broadcast to (batch, seq_len, num_classes)
+    return (input_expanded == class_range).float()
 
 
 def logsumexp(input: Tensor, dim: int) -> Tensor:
@@ -211,8 +230,12 @@ def logsumexp(input: Tensor, dim: int) -> Tensor:
             NOTE: minitorch functions/tensor functions typically keep dimensions if you provide a dimensions.
     """  
     ### BEGIN ASSIGN3_1
-    raise NotImplementedError
+    e = input
+    mx = Max.apply(e, tensor([dim]))
+    out = (e - mx).exp().sum(dim=dim).log() + mx
+    return out
     ### END ASSIGN3_1
+    
 
 
 def softmax_loss(logits: Tensor, target: Tensor) -> Tensor:
@@ -228,6 +251,15 @@ def softmax_loss(logits: Tensor, target: Tensor) -> Tensor:
     """
     result = None
     ### BEGIN ASSIGN3_1
-    raise NotImplementedError
+    batch_size, num_classes = logits.shape
+    # convert [2, 0, 1] to [[0, 0, 1], [1, 0, 0], [0, 1, 0]]
+    one_hot_target = one_hot(target, num_classes) # one_hot_target: (batch_size, num_classes)
+    # select logit for the right class
+    selected_logit = (one_hot_target * logits).sum(dim=1)
+    # logsumexp over classes for each example
+    lse = logsumexp(logits, dim=1)  # (batch_size, )
+    # Final loss: -selected_logit + lse
+    result = -selected_logit + lse
     ### END ASSIGN3_1
     return result.view(batch_size, )
+
