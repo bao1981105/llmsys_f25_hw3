@@ -1,0 +1,6 @@
+# Ignore all .npy files
+*.npy
+# Ignore log files
+*.log
+
+

@@ -325,8 +325,8 @@ class DecoderLM(Module):
         x = self.t_layer_3(x)
         x = self.t_layer_4(x)
         # 6. Apply final layer normalization
-        x = self.ln(x)
+        x = self.ln(x.view(batch_size * seq_len, self.n_embd))
         # 7. Project to vocabulary size using lm_head
         logits = self.lm_head(x)  # (batch_size, seq_len, n_vocab)
-        return logits
+        return logits.view(batch_size, seq_len, self.n_vocab)
         ### END ASSIGN3_3
