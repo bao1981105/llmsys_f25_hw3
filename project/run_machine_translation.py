@@ -317,27 +317,27 @@ def generate(
         # Run generation for every single example
         token_ids = tokenizer(f'{example[src_key]}<eos_{src_key}>')['input_ids']
         len_src = len(token_ids)
-        generated_token_ids = list(token_ids)
         while len(token_ids) <= model_max_length:
             # BEGIN ASSIGN3_4
             # TODO
-            # Convert token_ids to minitorch tensor
-            input_tensor = minitorch.tensor(token_ids, backend=backend)
-            # Get logits from the model
-            logits = model(input_tensor)
-            # Get the last token's logits
-            last_token_logits = logits[-1, :]
-            # Apply argmax to get the generated token ID
-            gen_id = minitorch.argmax(last_token_logits).item()
-            # Append the generated token
-            
+            # run the model with current token_ids, and predict the next token (gen_id)
+            # hint: obtain the logits of next token, and take the argmax.
+            gen_id = 0
+            input_arr = np.array(token_ids, dtype=np.int32).reshape(1, -1) # batch size = 1
+            input_tensor = minitorch.tensor_from_numpy(input_arr, backend=backend) # (1, seq_len)
+            # Get logits from model: (1, seq_len, vocab_size)
+            logits = model(input_tensor)  # shape: (1, seq_len, vocab_size)
+            # Get logits for last position (the next token to predict)
+            next_logits = logits[0, len(token_ids) - 1]  # shape: (vocab_size,)
+            # Argmax to get next token id
+            gen_id = int((next_logits == next_logits.max()).to_numpy().nonzero()[0][0])
             # END ASSIGN3_4
             if gen_id == tokenizer.vocab[f'<eos_{tgt_key}>']:
                 break
             else:
-                generated_token_ids.append(gen_id)
+                token_ids.append(gen_id)
 
-        gen_sents.append(tokenizer.decode(generated_token_ids[len_src:]))
+        gen_sents.append(tokenizer.decode(token_ids[len_src:]))
 
     return gen_sents
 
