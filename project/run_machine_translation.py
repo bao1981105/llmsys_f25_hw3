@@ -66,7 +66,7 @@ def get_dataset(dataset_name, model_max_length, max_examples=100):
                 example[tgt_key].split()) < model_max_length
         ] for split in dataset.keys()
     }
-    dataset['test'] = dataset['test'][:10]  # even smaller for test
+    dataset['test'] = dataset['test']  # even smaller for test
     print(json.dumps(
         {'data_size': {split: len(dataset[split]) for split in dataset.keys()}},
         indent=4))
@@ -315,31 +315,29 @@ def generate(
     gen_sents = []
     for example in tqdm.tqdm(examples, desc=f'Generating {desc}'):
         # Run generation for every single example
-
         token_ids = tokenizer(f'{example[src_key]}<eos_{src_key}>')['input_ids']
         len_src = len(token_ids)
-
+        generated_token_ids = list(token_ids)
         while len(token_ids) <= model_max_length:
             # BEGIN ASSIGN3_4
             # TODO
-            # run the model with current token_ids, and predict the next token (gen_id)
-            # hint: obtain the logits of next token, and take the argmax.
-            gen_id = 0
-            input_arr = np.array(token_ids, dtype=np.int32).reshape(1, -1) # batch size = 1
-            input_tensor = minitorch.tensor_from_numpy(input_arr, backend=backend) # (1, seq_len)
-            # Get logits from model: (1, seq_len, vocab_size)
-            logits = model(input_tensor)  # shape: (1, seq_len, vocab_size)
-            # Get logits for last position (the next token to predict)
-            next_logits = logits[0, -1]  # shape: (vocab_size,)
-            # Argmax to get next token id
-            gen_id = int((next_logits == next_logits.max()).to_numpy().nonzero()[0][0])
+            # Convert token_ids to minitorch tensor
+            input_tensor = minitorch.tensor(token_ids, backend=backend)
+            # Get logits from the model
+            logits = model(input_tensor)
+            # Get the last token's logits
+            last_token_logits = logits[-1, :]
+            # Apply argmax to get the generated token ID
+            gen_id = minitorch.argmax(last_token_logits).item()
+            # Append the generated token
+            
             # END ASSIGN3_4
             if gen_id == tokenizer.vocab[f'<eos_{tgt_key}>']:
                 break
             else:
-                token_ids.append(gen_id)
+                generated_token_ids.append(gen_id)
 
-        gen_sents.append(tokenizer.decode(token_ids[len_src:]))
+        gen_sents.append(tokenizer.decode(generated_token_ids[len_src:]))
 
     return gen_sents
 
@@ -481,8 +479,8 @@ def main(
     n_epochs=1,
     batch_size=8,
     learning_rate=0.02,
-    samples_per_epoch=32,
-    n_vocab=1000,
+    samples_per_epoch=128,
+    n_vocab=2000,
     n_embd=16,
     seed=11111
 ):
@@ -524,7 +522,7 @@ def main(
     optimizer = minitorch.Adam(model.parameters(), lr=learning_rate)
 
     dataset, src_key, tgt_key = get_dataset(
-        dataset_name=dataset_name, model_max_length=model_max_length, max_examples=32)
+        dataset_name=dataset_name, model_max_length=model_max_length, max_examples=2560)
 
     tokenizer = get_tokenizer(
         examples=dataset['train'],
