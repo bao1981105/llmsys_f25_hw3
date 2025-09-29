@@ -16,49 +16,26 @@ from minitorch import DecoderLM
 from minitorch.cuda_kernel_ops import CudaKernelOps
 
 
-# def get_dataset(dataset_name, model_max_length):
-#     """
-#     Load and preprocess IWSLT (de-en) dataset.
+def get_dataset(dataset_name, model_max_length):
+    """
+    Load and preprocess IWSLT (de-en) dataset.
     
-#     Args:
-#         dataset_name (str): Name of the dataset to load
-#         model_max_length (int): Maximum sequence length for filtering examples
+    Args:
+        dataset_name (str): Name of the dataset to load
+        model_max_length (int): Maximum sequence length for filtering examples
 
-#     Returns:
-#         tuple: (dataset, src_key, tgt_key) where:
-#             - dataset: Dictionary with 'train', 'validation', 'test' splits
-#             - src_key (str): Source language key ('de')
-#             - tgt_key (str): Target language key ('en')
-#     """
-#     dataset = {
-#         split: datasets.load_dataset(dataset_name, split=split)['translation']
-#         for split in ['train', 'validation', 'test']
-#     }
-#     src_key, tgt_key = 'de', 'en'
-
-#     dataset = {
-#         split: [
-#             example for example in dataset[split]
-#             if len(example[src_key].split()) + len(
-#                 example[tgt_key].split()) < model_max_length
-#         ] for split in dataset.keys()
-#     }
-
-#     dataset['test'] = dataset['test'][:100]  # 6750
-
-#     print(json.dumps(
-#         {'data_size': {split: len(dataset[split]) for split in dataset.keys()}},
-#         indent=4))
-
-#     return dataset, src_key, tgt_key
-
-
-def get_dataset(dataset_name, model_max_length, max_examples=100):
+    Returns:
+        tuple: (dataset, src_key, tgt_key) where:
+            - dataset: Dictionary with 'train', 'validation', 'test' splits
+            - src_key (str): Source language key ('de')
+            - tgt_key (str): Target language key ('en')
+    """
     dataset = {
-        split: datasets.load_dataset(dataset_name, split=split)['translation'][:max_examples]
+        split: datasets.load_dataset(dataset_name, split=split)['translation']
         for split in ['train', 'validation', 'test']
     }
     src_key, tgt_key = 'de', 'en'
+
     dataset = {
         split: [
             example for example in dataset[split]
@@ -66,11 +43,34 @@ def get_dataset(dataset_name, model_max_length, max_examples=100):
                 example[tgt_key].split()) < model_max_length
         ] for split in dataset.keys()
     }
-    dataset['test'] = dataset['test']  # even smaller for test
+
+    dataset['test'] = dataset['test'][:100]  # 6750
+
     print(json.dumps(
         {'data_size': {split: len(dataset[split]) for split in dataset.keys()}},
         indent=4))
+
     return dataset, src_key, tgt_key
+
+
+# def get_dataset(dataset_name, model_max_length, max_examples=100):
+#     dataset = {
+#         split: datasets.load_dataset(dataset_name, split=split)['translation'][:max_examples]
+#         for split in ['train', 'validation', 'test']
+#     }
+#     src_key, tgt_key = 'de', 'en'
+#     dataset = {
+#         split: [
+#             example for example in dataset[split]
+#             if len(example[src_key].split()) + len(
+#                 example[tgt_key].split()) < model_max_length
+#         ] for split in dataset.keys()
+#     }
+#     dataset['test'] = dataset['test']  # even smaller for test
+#     print(json.dumps(
+#         {'data_size': {split: len(dataset[split]) for split in dataset.keys()}},
+#         indent=4))
+#     return dataset, src_key, tgt_key
 
 
 def get_tokenizer(examples, vocab_size, src_key, tgt_key, workdir):
@@ -328,9 +328,10 @@ def generate(
             # Get logits from model: (1, seq_len, vocab_size)
             logits = model(input_tensor)  # shape: (1, seq_len, vocab_size)
             # Get logits for last position (the next token to predict)
+            logits = logits.to_numpy()
             next_logits = logits[0, len(token_ids) - 1]  # shape: (vocab_size,)
             # Argmax to get next token id
-            gen_id = int((next_logits == next_logits.max()).to_numpy().nonzero()[0][0])
+            gen_id = int((next_logits == next_logits.max()).nonzero()[0][0])
             # END ASSIGN3_4
             if gen_id == tokenizer.vocab[f'<eos_{tgt_key}>']:
                 break
@@ -361,127 +362,15 @@ def evaluate_bleu(examples, gen_sents, tgt_key):
     }
 
 
-# def main(
-#     dataset_name='bbaaaa/iwslt14-de-en-preprocess',
-#     model_max_length=40,
-#     n_epochs=20,
-#     batch_size=128,
-#     learning_rate=0.02,
-#     samples_per_epoch=20000,
-#     n_vocab=10000,
-#     n_embd=256,
-#     seed=11111
-# ):
-#     """
-#     Train and evaluate a decoder-only transformer language model.
-    
-#     Args:
-#         dataset_name (str): Name of the dataset to use, default 'bbaaaa/iwslt14-de-en-preprocess'
-#         model_max_length (int): Maximum sequence length, default 40
-#         n_epochs (int): Number of training epochs, default 20
-#         batch_size (int): Number of examples per batch, default 128
-#         learning_rate (float): Learning rate for optimizer, default 0.02
-#         samples_per_epoch (int): Training samples per epoch, default 20000
-#         n_vocab (int): Vocabulary size for tokenizer, default 10000
-#         n_embd (int): Embedding dimension, default 256
-#         seed (int): Random seed, default 11111
-#     """
-
-#     np.random.seed(seed)
-#     random.seed(seed)
-
-#     workdir = f'./workdir_vocab{n_vocab}_lr{learning_rate}_embd{n_embd}'
-#     os.makedirs(workdir, exist_ok=True)
-
-#     backend = minitorch.TensorBackend(CudaKernelOps)
-
-#     config = {
-#         'n_vocab': n_vocab,  # vocab_size
-#         'n_embd': n_embd,  # n_embed
-#         'n_head': 8,  # n_head
-#         'n_positions': model_max_length,  # n_ctx == n_positions
-#         # 'n_layer'     : 4,    # n_layer
-#         'p_dropout': 0.1,  # x_pdrop
-#         'ln_eps': 1e-5,  # layer_norm_epsilon
-#         'backend': backend
-#     }
-
-#     model = DecoderLM(**config)
-#     optimizer = minitorch.Adam(model.parameters(), lr=learning_rate)
-
-#     dataset, src_key, tgt_key = get_dataset(
-#         dataset_name=dataset_name, model_max_length=model_max_length)
-
-#     tokenizer = get_tokenizer(
-#         examples=dataset['train'],
-#         vocab_size=config['n_vocab'],
-#         src_key=src_key,
-#         tgt_key=tgt_key,
-#         workdir=workdir)
-
-#     collate_fn = partial(
-#         collate_batch,
-#         src_key=src_key,
-#         tgt_key=tgt_key,
-#         tokenizer=tokenizer,
-#         model_max_length=model_max_length,
-#         backend=backend)
-
-#     for epoch_idx in range(n_epochs):
-#         desc = f'epoch {epoch_idx} / {n_epochs}'
-
-#         train(
-#             model=model,
-#             optimizer=optimizer,
-#             examples=dataset['train'],
-#             n_samples=samples_per_epoch,
-#             batch_size=batch_size,
-#             collate_fn=collate_fn,
-#             desc=desc)
-
-#         validation_loss = evaluate_loss(
-#             model=model,
-#             examples=dataset['validation'],
-#             batch_size=batch_size,
-#             collate_fn=collate_fn,
-#             desc=desc)
-
-#         print(f'Epoch {epoch_idx}: Validation Loss = {validation_loss}')
-
-#         gen_sents = generate(
-#             model=model,
-#             examples=dataset['test'],
-#             src_key=src_key,
-#             tgt_key=tgt_key,
-#             tokenizer=tokenizer,
-#             model_max_length=model_max_length,
-#             backend=backend,
-#             desc=desc)
-
-#         gen_examples = []
-#         for example, gen_sent in zip(dataset['test'], gen_sents):
-#             gen_examples.append({'example': example, 'gen': gen_sent})
-#         json.dump(gen_examples, open(
-#             f'{workdir}/gen_epoch{epoch_idx}.json', 'w'), indent=4)
-
-#         eval_scores = evaluate_bleu(
-#             examples=dataset['test'], gen_sents=gen_sents, tgt_key=tgt_key)
-#         print(f'Epoch {epoch_idx}: {eval_scores}')
-
-#         json.dump(
-#             {'validation_loss': float(validation_loss), **eval_scores},
-#             open(f'{workdir}/eval_results_epoch{epoch_idx}.json', 'w'))
-
-
 def main(
     dataset_name='bbaaaa/iwslt14-de-en-preprocess',
-    model_max_length=20,
-    n_epochs=1,
-    batch_size=8,
+    model_max_length=40,
+    n_epochs=10,
+    batch_size=128,
     learning_rate=0.02,
-    samples_per_epoch=128,
-    n_vocab=2000,
-    n_embd=16,
+    samples_per_epoch=20000,
+    n_vocab=10000,
+    n_embd=256,
     seed=11111
 ):
     """
@@ -522,7 +411,7 @@ def main(
     optimizer = minitorch.Adam(model.parameters(), lr=learning_rate)
 
     dataset, src_key, tgt_key = get_dataset(
-        dataset_name=dataset_name, model_max_length=model_max_length, max_examples=2560)
+        dataset_name=dataset_name, model_max_length=model_max_length)
 
     tokenizer = get_tokenizer(
         examples=dataset['train'],
@@ -583,6 +472,118 @@ def main(
         json.dump(
             {'validation_loss': float(validation_loss), **eval_scores},
             open(f'{workdir}/eval_results_epoch{epoch_idx}.json', 'w'))
+
+
+# def main(
+#     dataset_name='bbaaaa/iwslt14-de-en-preprocess',
+#     model_max_length=20,
+#     n_epochs=1,
+#     batch_size=8,
+#     learning_rate=0.02,
+#     samples_per_epoch=128,
+#     n_vocab=2000,
+#     n_embd=16,
+#     seed=11111
+# ):
+#     """
+#     Train and evaluate a decoder-only transformer language model.
+    
+#     Args:
+#         dataset_name (str): Name of the dataset to use, default 'bbaaaa/iwslt14-de-en-preprocess'
+#         model_max_length (int): Maximum sequence length, default 40
+#         n_epochs (int): Number of training epochs, default 20
+#         batch_size (int): Number of examples per batch, default 128
+#         learning_rate (float): Learning rate for optimizer, default 0.02
+#         samples_per_epoch (int): Training samples per epoch, default 20000
+#         n_vocab (int): Vocabulary size for tokenizer, default 10000
+#         n_embd (int): Embedding dimension, default 256
+#         seed (int): Random seed, default 11111
+#     """
+
+#     np.random.seed(seed)
+#     random.seed(seed)
+
+#     workdir = f'./workdir_vocab{n_vocab}_lr{learning_rate}_embd{n_embd}'
+#     os.makedirs(workdir, exist_ok=True)
+
+#     backend = minitorch.TensorBackend(CudaKernelOps)
+
+#     config = {
+#         'n_vocab': n_vocab,  # vocab_size
+#         'n_embd': n_embd,  # n_embed
+#         'n_head': 8,  # n_head
+#         'n_positions': model_max_length,  # n_ctx == n_positions
+#         # 'n_layer'     : 4,    # n_layer
+#         'p_dropout': 0.1,  # x_pdrop
+#         'ln_eps': 1e-5,  # layer_norm_epsilon
+#         'backend': backend
+#     }
+
+#     model = DecoderLM(**config)
+#     optimizer = minitorch.Adam(model.parameters(), lr=learning_rate)
+
+#     dataset, src_key, tgt_key = get_dataset(
+#         dataset_name=dataset_name, model_max_length=model_max_length, max_examples=2560)
+
+#     tokenizer = get_tokenizer(
+#         examples=dataset['train'],
+#         vocab_size=config['n_vocab'],
+#         src_key=src_key,
+#         tgt_key=tgt_key,
+#         workdir=workdir)
+
+#     collate_fn = partial(
+#         collate_batch,
+#         src_key=src_key,
+#         tgt_key=tgt_key,
+#         tokenizer=tokenizer,
+#         model_max_length=model_max_length,
+#         backend=backend)
+
+#     for epoch_idx in range(n_epochs):
+#         desc = f'epoch {epoch_idx} / {n_epochs}'
+
+#         train(
+#             model=model,
+#             optimizer=optimizer,
+#             examples=dataset['train'],
+#             n_samples=samples_per_epoch,
+#             batch_size=batch_size,
+#             collate_fn=collate_fn,
+#             desc=desc)
+
+#         validation_loss = evaluate_loss(
+#             model=model,
+#             examples=dataset['validation'],
+#             batch_size=batch_size,
+#             collate_fn=collate_fn,
+#             desc=desc)
+
+#         print(f'Epoch {epoch_idx}: Validation Loss = {validation_loss}')
+
+#         gen_sents = generate(
+#             model=model,
+#             examples=dataset['test'],
+#             src_key=src_key,
+#             tgt_key=tgt_key,
+#             tokenizer=tokenizer,
+#             model_max_length=model_max_length,
+#             backend=backend,
+#             desc=desc)
+
+#         gen_examples = []
+#         for example, gen_sent in zip(dataset['test'], gen_sents):
+#             gen_examples.append({'example': example, 'gen': gen_sent})
+#         json.dump(gen_examples, open(
+#             f'{workdir}/gen_epoch{epoch_idx}.json', 'w'), indent=4)
+
+#         eval_scores = evaluate_bleu(
+#             examples=dataset['test'], gen_sents=gen_sents, tgt_key=tgt_key)
+#         print(f'Epoch {epoch_idx}: {eval_scores}')
+
+#         json.dump(
+#             {'validation_loss': float(validation_loss), **eval_scores},
+#             open(f'{workdir}/eval_results_epoch{epoch_idx}.json', 'w'))
 
 if __name__ == '__main__':
     fire.Fire(main)

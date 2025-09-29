@@ -111,7 +111,7 @@ class Linear(Module):
         self.weights = Parameter(
             tensor_from_numpy(
                 np.random.uniform(-bound, bound, (in_size, out_size)),
-                backend=backend
+                backend=self.backend
             )
         ) 
         # weights shape (in_size, out_size)
@@ -119,7 +119,7 @@ class Linear(Module):
             self.bias = Parameter(
                 tensor_from_numpy(
                     np.random.uniform(-bound, bound, (out_size,)),
-                    backend=backend
+                    backend=self.backend
                 )
             )
         else:
@@ -174,9 +174,9 @@ class LayerNorm1d(Module):
         self.dim = dim
         self.eps = eps
         ### BEGIN ASSIGN3_2
+        self.backend = backend
         self.weights = Parameter(tensor_from_numpy(np.ones(dim), backend=backend))
         self.bias = Parameter(tensor_from_numpy(np.zeros(dim), backend=backend))
-        self.backend = backend
         ### END ASSIGN3_2
 
     def forward(self, x: Tensor) -> Tensor:

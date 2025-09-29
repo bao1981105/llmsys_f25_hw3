@@ -45,10 +45,10 @@ class MultiHeadAttention(Module):
         self.attn_hidden_dim = n_embd // n_head
 
         ### BEGIN ASSIGN3_3
-        self.q_projection = Linear(n_embd, n_embd, bias=bias, backend=backend)
-        self.k_projection = Linear(n_embd, n_embd, bias=bias, backend=backend)
-        self.v_projection = Linear(n_embd, n_embd, bias=bias, backend=backend)
-        self.out_projection = Linear(n_embd, n_embd, bias=bias, backend=backend)
+        self.q_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
+        self.k_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
+        self.v_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
+        self.out_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
         self.dropout = Dropout(p_dropout)
         ### END ASSIGN3_3
 
@@ -280,15 +280,15 @@ class DecoderLM(Module):
         self.n_embd = n_embd
         self.n_vocab = n_vocab
         ### BEGIN ASSIGN3_3
-        self.token_embeddings = Embedding(n_vocab, n_embd, backend=backend)
-        self.position_embeddings = Embedding(n_positions, n_embd, backend=backend)
-        self.t_layer_1 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=backend)
-        self.t_layer_2 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=backend)
-        self.t_layer_3 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=backend)
-        self.t_layer_4 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=backend)
+        self.token_embeddings = Embedding(n_vocab, n_embd, backend=self.backend)
+        self.position_embeddings = Embedding(n_positions, n_embd, backend=self.backend)
+        self.t_layer_1 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=self.backend)
+        self.t_layer_2 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=self.backend)
+        self.t_layer_3 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=self.backend)
+        self.t_layer_4 = TransformerLayer(n_embd, n_head, p_dropout=p_dropout, ln_eps=ln_eps, bias=bias, backend=self.backend)
         self.dropout = Dropout(p_dropout)
-        self.ln = LayerNorm1d(n_embd, ln_eps, backend=backend)
-        self.lm_head = Linear(n_embd, n_vocab, bias=bias, backend=backend)
+        self.ln = LayerNorm1d(n_embd, ln_eps, backend=self.backend)
+        self.lm_head = Linear(n_embd, n_vocab, bias=bias, backend=self.backend)
         ### END ASSIGN3_3
     
     def forward(self, idx):
