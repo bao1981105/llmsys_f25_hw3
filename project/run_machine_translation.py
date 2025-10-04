@@ -10,9 +10,10 @@ import numpy as np
 from sacrebleu.metrics import BLEU
 from transformers import AutoTokenizer
 from tokenizers import ByteLevelBPETokenizer
-
+import torch
 import minitorch
 from minitorch import DecoderLM
+#from minitorch import SimpleOps, CudaKernelOps
 from minitorch.cuda_kernel_ops import CudaKernelOps
 
 
@@ -310,7 +311,7 @@ def generate(
     Returns:
         list: Generated target sequences
     """
-
+    print("generate backend:", backend.cuda)
     model.eval()
     gen_sents = []
     for example in tqdm.tqdm(examples, desc=f'Generating {desc}'):
@@ -390,12 +391,16 @@ def main(
 
     np.random.seed(seed)
     random.seed(seed)
+    
+    print("PyTorch Version:", torch.__version__)
+    print("CUDA Available:", torch.cuda.is_available())
+    print("CUDA Version:", torch.version.cuda)
 
     workdir = f'./workdir_vocab{n_vocab}_lr{learning_rate}_embd{n_embd}'
     os.makedirs(workdir, exist_ok=True)
 
     backend = minitorch.TensorBackend(CudaKernelOps)
-
+    print("main backend:", backend.cuda)
     config = {
         'n_vocab': n_vocab,  # vocab_size
         'n_embd': n_embd,  # n_embed

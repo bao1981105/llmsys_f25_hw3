@@ -18,6 +18,54 @@ if TYPE_CHECKING:
     from .tensor import Tensor
     from .tensor_data import Index, Shape, Storage, Strides
 
+import ctypes
+import pycuda.autoinit
+#import pycuda.driver as cuda
+
+
+# from numba import cuda
+# cuda.select_device(0)  # ensure primary context
+# import torch
+# assert torch.cuda.is_available()
+# print("Torch CUDA:", torch.version.cuda)
+# print("Device:", torch.cuda.get_device_name(0))
+# # If using CuPy:
+# #import cupy as cp  # attaches to primary context typically
+# # If using PyCUDA, avoid autoinit:
+# import pycuda.driver as drv
+# drv.init()
+# dev = drv.Device(0)
+# # attach to primary context instead of creating new
+# ctx = drv.Context.attach()
+
+# Load the shared library
+lib = ctypes.CDLL("minitorch/cuda_kernels/combine.so")
+datatype = np.float32
+
+# function map
+fn_map = {
+  operators.add: 1,
+  operators.mul: 2,
+  operators.id: 3,
+  operators.neg: 4,
+  operators.lt: 5,
+  operators.eq: 6,
+  operators.sigmoid: 7,
+  operators.relu: 8,
+  operators.relu_back: 9,
+  operators.log: 10,
+  operators.log_back: 11,
+  operators.exp: 12,
+  operators.inv: 13,
+  operators.inv_back: 14,
+  operators.is_close: 15,
+  operators.max: 16,
+  operators.pow: 17, 
+  operators.tanh: 18
+}
+
+THREADS_PER_BLOCK = 32
+
 
 class MapProto(Protocol):
     def __call__(self, x: Tensor, out: Optional[Tensor] = ..., /) -> Tensor:
@@ -377,3 +425,4 @@ def tensor_reduce(
 
 
 SimpleBackend = TensorBackend(SimpleOps)
+

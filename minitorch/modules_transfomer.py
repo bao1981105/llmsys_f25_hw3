@@ -43,7 +43,7 @@ class MultiHeadAttention(Module):
         self.n_head = n_head
         self.causal = causal
         self.attn_hidden_dim = n_embd // n_head
-
+        print(f"MultiHeadAttention Backend used: {self.backend.cuda}")
         ### BEGIN ASSIGN3_3
         self.q_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
         self.k_projection = Linear(n_embd, n_embd, bias=bias, backend=self.backend)
@@ -167,6 +167,7 @@ class FeedForward(Module):
         self.linear_in  = Linear(n_embd, middle_dim, bias=bias, backend=backend)
         self.linear_out = Linear(middle_dim, n_embd, bias=bias, backend=backend)
         self.dropout = Dropout(p_dropout)
+        print(f"FeedForward Backend used: {backend.cuda}")
         ### END ASSIGN3_3
 
     def forward(self, x):
@@ -210,10 +211,12 @@ class TransformerLayer(Module):
             ff (FeedForward): Feed-forward network layer
         """
         ### BEGIN ASSIGN3_3
+        #self.backend = backend
         self.ln_1 = LayerNorm1d(n_embd, eps=ln_eps, backend=backend)
         self.ln_2 = LayerNorm1d(n_embd, eps=ln_eps, backend=backend)
         self.attention = MultiHeadAttention(n_embd, n_head, causal=True, p_dropout=p_dropout, bias=bias, backend=backend)
         self.ff = FeedForward(n_embd, middle_dim=4*n_embd, p_dropout=p_dropout, bias=bias, backend=backend)
+        print(f"TransformerLayer Backend used: {backend.cuda}")
         ### END ASSIGN3_3
 
     def forward(self, x):
@@ -289,6 +292,7 @@ class DecoderLM(Module):
         self.dropout = Dropout(p_dropout)
         self.ln = LayerNorm1d(n_embd, ln_eps, backend=self.backend)
         self.lm_head = Linear(n_embd, n_vocab, bias=bias, backend=self.backend)
+        print(f"DecoderLM Backend used: {backend.cuda}")
         ### END ASSIGN3_3
     
     def forward(self, idx):

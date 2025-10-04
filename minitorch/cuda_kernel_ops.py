@@ -50,11 +50,13 @@ fn_map = {
 THREADS_PER_BLOCK = 32
 
 class CudaKernelOps(TensorOps):
+    # is_cuda = True
+    # cuda = True
     @staticmethod
     def map(fn: Callable[[float], float]) -> MapProto:
         "See `tensor_ops.py`"
         fn_id = fn_map[fn]
-
+        print("hanah gpu")
         def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
             if out is None:
                 out = a.zeros(a.shape)
@@ -95,7 +97,7 @@ class CudaKernelOps(TensorOps):
     @staticmethod
     def zip(fn: Callable[[float, float], float]) -> Callable[[Tensor, Tensor], Tensor]:
         fn_id = fn_map[fn]
-
+        print("hanah gpu")
         def ret(a: Tensor, b: Tensor) -> Tensor:
             c_shape = shape_broadcast(a.shape, b.shape)
             out = a.zeros(c_shape)
